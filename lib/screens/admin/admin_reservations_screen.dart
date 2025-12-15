@@ -82,17 +82,75 @@ class _AdminReservationsScreenState extends State<AdminReservationsScreen> {
               icon: const Icon(Icons.close, color: Colors.redAccent),
               tooltip: 'Decline',
               onPressed: () {
-                widget.dataService.updateReservationStatus(
-                    r.id, ReservationStatus.declined);
-                setState(() {});
+                showDialog<String?>(
+                  context: context,
+                  builder: (ctx) {
+                    final controller = TextEditingController();
+                    return AlertDialog(
+                      title: const Text('Reason for rejection'),
+                      content: TextField(
+                        controller: controller,
+                        decoration: const InputDecoration(
+                          hintText: 'Optional: explain why this was declined',
+                        ),
+                        maxLines: 3,
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+                          child: const Text('Save'),
+                        ),
+                      ],
+                    );
+                  },
+                ).then((reason) {
+                  widget.dataService.updateReservationStatus(
+                    r.id,
+                    ReservationStatus.declined,
+                    rejectionReason: (reason != null && reason.isNotEmpty)
+                        ? reason
+                        : null,
+                  );
+                  setState(() {});
+                });
               },
             ),
             IconButton(
               icon: const Icon(Icons.check_circle, color: Colors.green),
               tooltip: 'Approve',
               onPressed: () {
-                widget.dataService.updateReservationStatus(
-                    r.id, ReservationStatus.approved);
+                final hasConflictingApproved = widget
+                    .dataService.reservations
+                    .any((other) {
+                  if (other.id == r.id) return false;
+                  if (other.equipment.id != r.equipment.id) return false;
+                  if (other.status != ReservationStatus.approved &&
+                      other.status != ReservationStatus.checkedOut) {
+                    return false;
+                  }
+                  final overlaps =
+                      !(r.endDate.isBefore(other.startDate) ||
+                        r.startDate.isAfter(other.endDate));
+                  return overlaps;
+                });
+
+                if (hasConflictingApproved) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Cannot approve this request because it conflicts with an existing approved rental for this item.',
+                      ),
+                    ),
+                  );
+                  return;
+                }
+
+                widget.dataService
+                    .updateReservationStatus(r.id, ReservationStatus.approved);
                 setState(() {});
               },
             ),

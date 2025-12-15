@@ -20,29 +20,60 @@ class EquipmentDetailsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canReserve = user.role == UserRole.renter &&
-        (equipment.status == EquipmentStatus.available ||
-            equipment.status == EquipmentStatus.donated);
+        equipment.status == EquipmentStatus.available;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(equipment.name),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (equipment.imageBytes != null ||
+                (equipment.imageUrl != null &&
+                    equipment.imageUrl!.trim().isNotEmpty))
+              SizedBox(
+                height: 200,
+                width: double.infinity,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: equipment.imageBytes != null
+                      ? Image.memory(
+                          equipment.imageBytes!,
+                          fit: BoxFit.cover,
+                        )
+                      : Image.network(
+                          equipment.imageUrl!.trim(),
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, _, __) => Container(
+                            color: Colors.grey.shade200,
+                            alignment: Alignment.center,
+                            child: const Text('Image could not be loaded'),
+                          ),
+                        ),
+                ),
+              ),
+            if (equipment.imageBytes != null ||
+                (equipment.imageUrl != null &&
+                    equipment.imageUrl!.trim().isNotEmpty))
+              const SizedBox(height: 16),
             Text(
               equipment.name,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              style:
+                  const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
+            Text('ID: ${equipment.id}'),
+            const SizedBox(height: 4),
             Text('${equipment.type} • ${equipment.location}'),
             const SizedBox(height: 8),
             Text('Condition: ${equipment.condition}'),
             const SizedBox(height: 8),
             if (equipment.rentalPricePerDay != null)
-              Text('Price: ${equipment.rentalPricePerDay!.toStringAsFixed(1)} BD/day'),
+              Text(
+                  'Price: ${equipment.rentalPricePerDay!.toStringAsFixed(1)} BD/day'),
             const SizedBox(height: 16),
             const Text(
               'Description',
@@ -60,7 +91,7 @@ class EquipmentDetailsScreen extends StatelessWidget {
                     .map((t) => Chip(label: Text(t)))
                     .toList(),
               ),
-            const Spacer(),
+            const SizedBox(height: 24),
             if (canReserve)
               SizedBox(
                 width: double.infinity,
@@ -82,7 +113,7 @@ class EquipmentDetailsScreen extends StatelessWidget {
               )
             else
               const Text(
-                'Only renters can reserve, and only available/donated items can be reserved.',
+                'Only renters can reserve, and only items marked as Available can be reserved. Rented, Donated, or Under Maintenance items are not rentable.',
                 style: TextStyle(color: Colors.grey),
               ),
           ],

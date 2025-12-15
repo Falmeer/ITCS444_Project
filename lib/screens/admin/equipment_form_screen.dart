@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../models/equipment.dart';
 import '../../services/fake_data_services.dart';
@@ -28,6 +31,10 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
   late int _quantity;
   double? _rentalPricePerDay;
   EquipmentStatus _status = EquipmentStatus.available;
+  String? _selectedTypeOption;
+  final TextEditingController _otherTypeController = TextEditingController();
+  Uint8List? _imageBytes;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -42,11 +49,33 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
     _quantity = eq?.quantity ?? 1;
     _rentalPricePerDay = eq?.rentalPricePerDay;
     _status = eq?.status ?? EquipmentStatus.available;
+    _imageBytes = eq?.imageBytes;
+    // If existing type matches one of predefined options, select it; otherwise mark as Other.
+    const predefinedTypes = [
+      'Wheelchair',
+      'Walker',
+      'Crutches',
+      'Hospital Bed',
+      'Oxygen Machine',
+    ];
+    if (predefinedTypes.contains(_type)) {
+      _selectedTypeOption = _type;
+    } else if (_type.isNotEmpty) {
+      _selectedTypeOption = 'Other';
+      _otherTypeController.text = _type;
+    }
   }
 
   void _save() {
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
+
+    // Resolve the actual type from the dropdown + optional "Other" field.
+    if (_selectedTypeOption == 'Other') {
+      _type = _otherTypeController.text.trim();
+    } else {
+      _type = (_selectedTypeOption ?? '').trim();
+    }
 
     final tagsList = _tags
         .split(',')
@@ -65,7 +94,8 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
       status: _status,
       quantity: _quantity,
       rentalPricePerDay: _rentalPricePerDay,
-      imageUrl: widget.equipment?.imageUrl,
+        imageUrl: widget.equipment?.imageUrl,
+        imageBytes: _imageBytes,
     );
 
     if (widget.equipment == null) {
@@ -80,6 +110,8 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.equipment != null;
+    final idDisplay =
+        isEditing ? widget.equipment!.id : 'Will be generated when saved';
 
     return Scaffold(
       appBar: AppBar(
@@ -93,6 +125,15 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TextFormField(
+                initialValue: idDisplay,
+                decoration: const InputDecoration(
+                  labelText: 'Equipment ID',
+                  border: OutlineInputBorder(),
+                ),
+                enabled: false,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
                 initialValue: _name,
                 decoration: const InputDecoration(
                   labelText: 'Name',
@@ -102,14 +143,110 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
                 onSaved: (v) => _name = v!.trim(),
               ),
               const SizedBox(height: 12),
-              TextFormField(
-                initialValue: _type,
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      final picked = await _picker.pickImage(
+                        source: ImageSource.gallery,
+                        maxWidth: 1024,
+                      );
+                      if (picked != null) {
+                        final bytes = await picked.readAsBytes();
+                        setState(() {
+                          _imageBytes = bytes;
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.photo_library),
+                    label: const Text('Select Image'),
+                  ),
+                  const SizedBox(width: 12),
+                  if (_imageBytes != null)
+                    const Text('Image selected'),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (_imageBytes != null)
+                SizedBox(
+                  height: 140,
+                  width: double.infinity,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(
+                      _imageBytes!,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedTypeOption,
                 decoration: const InputDecoration(
-                  labelText: 'Type (e.g., Wheelchair)',
+                  labelText: 'Type',
                   border: OutlineInputBorder(),
                 ),
-                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
-                onSaved: (v) => _type = v!.trim(),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'Wheelchair',
+                    child: Text('Wheelchair'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'Walker',
+                    child: Text('Walker'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'Crutches',
+                    child: Text('Crutches'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'Hospital Bed',
+                    child: Text('Hospital Bed'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'Oxygen Machine',
+                    child: Text('Oxygen Machine'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'Other',
+                    child: Text('Other'),
+                  ),
+                ],
+                validator: (value) =>
+                    value == null || value.isEmpty ? 'Please choose a type' : null,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedTypeOption = value;
+                  });
+                },
+                onSaved: (_) {},
+              ),
+              Visibility(
+                visible: _selectedTypeOption == 'Other',
+                maintainState: true,
+                maintainAnimation: true,
+                maintainSize: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _otherTypeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Other type',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) {
+                        if (_selectedTypeOption == 'Other') {
+                          if (v == null || v.isEmpty) {
+                            return 'Please specify the type';
+                          }
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -184,7 +321,7 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<EquipmentStatus>(
-                value: _status,
+                initialValue: _status,
                 decoration: const InputDecoration(
                   labelText: 'Status',
                   border: OutlineInputBorder(),

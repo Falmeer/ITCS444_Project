@@ -45,7 +45,8 @@ class MyReservationsScreen extends StatelessWidget {
             title: Text(r.equipment.name),
             subtitle: Text(
               'From ${_formatDate(r.startDate)} to ${_formatDate(r.endDate)}\n'
-              'Status: $statusText',
+              'Status: $statusText'
+              '${r.status == ReservationStatus.declined && r.rejectionReason != null && r.rejectionReason!.isNotEmpty ? '\nReason: ${r.rejectionReason}' : ''}',
             ),
             isThreeLine: true,
             trailing: Column(

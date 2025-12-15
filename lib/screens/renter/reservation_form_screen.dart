@@ -24,14 +24,18 @@ class ReservationFormScreen extends StatefulWidget {
 class _ReservationFormScreenState extends State<ReservationFormScreen> {
   late DateTime _startDate;
   late DateTime _endDate;
+  late _DurationConfig _durationConfig;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
     _startDate = DateTime(now.year, now.month, now.day);
-    // simple auto-duration: 3 days by default
-    _endDate = _startDate.add(const Duration(days: 2));
+    _durationConfig = _durationConfigFor(widget.equipment);
+    // Auto-suggested duration based on equipment type.
+    _endDate = _startDate.add(
+      Duration(days: _durationConfig.suggestedDays - 1),
+    );
   }
 
   Future<void> _pickStartDate() async {
@@ -44,8 +48,19 @@ class _ReservationFormScreenState extends State<ReservationFormScreen> {
     if (picked != null) {
       setState(() {
         _startDate = picked;
-        if (_endDate.isBefore(_startDate)) {
-          _endDate = _startDate;
+        // Ensure end date stays within the allowed range relative to
+        // the (possibly new) start date.
+        final minEnd = _startDate.add(
+          Duration(days: _durationConfig.minDays - 1),
+        );
+        final maxEnd = _startDate.add(
+          Duration(days: _durationConfig.maxDays - 1),
+        );
+
+        if (_endDate.isBefore(minEnd)) {
+          _endDate = minEnd;
+        } else if (_endDate.isAfter(maxEnd)) {
+          _endDate = maxEnd;
         }
       });
     }
@@ -55,8 +70,12 @@ class _ReservationFormScreenState extends State<ReservationFormScreen> {
     final picked = await showDatePicker(
       context: context,
       initialDate: _endDate,
-      firstDate: _startDate,
-      lastDate: _startDate.add(const Duration(days: 30)),
+      firstDate: _startDate.add(
+        Duration(days: _durationConfig.minDays - 1),
+      ),
+      lastDate: _startDate.add(
+        Duration(days: _durationConfig.maxDays - 1),
+      ),
     );
     if (picked != null) {
       setState(() => _endDate = picked);
@@ -66,18 +85,36 @@ class _ReservationFormScreenState extends State<ReservationFormScreen> {
   int get _totalDays => _endDate.difference(_startDate).inDays + 1;
 
   bool _isAvailableForRange() {
-    final existing = widget.dataService.reservations.where((r) {
-      if (r.equipment.id != widget.equipment.id) return false;
-      if (r.status == ReservationStatus.declined ||
-          r.status == ReservationStatus.returned) {
-        return false;
-      }
-      final overlaps = !(_endDate.isBefore(r.startDate) ||
-          _startDate.isAfter(r.endDate));
-      return overlaps;
-    }).length;
+    // Only basic validation here: renters are allowed to submit
+    // requests even if dates overlap with others. Admin will decide
+    // which requests to approve.
+    return true;
+  }
 
-    return existing < widget.equipment.quantity;
+  _DurationConfig _durationConfigFor(Equipment equipment) {
+    final type = equipment.type.toLowerCase();
+
+    // 1. Short-term equipment: crutches, canes, walkers
+    if (type.contains('crutch') ||
+        type.contains('cane') ||
+        type.contains('walker')) {
+      return const _DurationConfig(minDays: 3, maxDays: 14, suggestedDays: 7);
+    }
+
+    // 2. Medium-term equipment: wheelchairs, shower chairs, commodes
+    if (type.contains('wheelchair') ||
+        type.contains('shower') ||
+        type.contains('commode')) {
+      return const _DurationConfig(minDays: 7, maxDays: 30, suggestedDays: 14);
+    }
+
+    // 3. Long-term / critical equipment: hospital beds, oxygen machines
+    if (type.contains('bed') || type.contains('oxygen')) {
+      return const _DurationConfig(minDays: 14, maxDays: 90, suggestedDays: 30);
+    }
+
+    // Fallback: treat as medium-short usage.
+    return const _DurationConfig(minDays: 3, maxDays: 30, suggestedDays: 7);
   }
 
   void _submit() {
@@ -142,6 +179,11 @@ class _ReservationFormScreenState extends State<ReservationFormScreen> {
               onTap: _pickEndDate,
             ),
             const SizedBox(height: 8),
+            Text(
+              'Allowed duration: ${_durationConfig.minDays}-${_durationConfig.maxDays} day(s). '
+              'Suggested: ${_durationConfig.suggestedDays} day(s).',
+            ),
+            const SizedBox(height: 4),
             Text('Duration: $_totalDays day(s)'),
             if (pricePerDay > 0)
               Text('Estimated total: ${totalPrice.toStringAsFixed(1)} BD'),
@@ -160,3 +202,16 @@ class _ReservationFormScreenState extends State<ReservationFormScreen> {
     );
   }
 }
+
+class _DurationConfig {
+  final int minDays;
+  final int maxDays;
+  final int suggestedDays;
+
+  const _DurationConfig({
+    required this.minDays,
+    required this.maxDays,
+    required this.suggestedDays,
+  });
+}
+

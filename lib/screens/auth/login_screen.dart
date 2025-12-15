@@ -1,6 +1,9 @@
 // lib/screens/auth/login_screen.dart
 import 'package:flutter/material.dart';
+
 import '../../models/user.dart';
+import '../../services/auth_service.dart';
+import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,27 +14,56 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  String _name = '';
   String _email = '';
-  String _phone = '';
-  String _preferredContact = 'Phone';
-  UserRole _selectedRole = UserRole.renter;
+  String _password = '';
+  bool _isSubmitting = false;
 
-  void _submit() {
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-
     _formKey.currentState!.save();
 
-    final user = User(
+    setState(() => _isSubmitting = true);
+
+    try {
+      final auth = AuthService();
+      final user = auth.login(_email, _password);
+
+      if (user == null) {
+        _showError('Invalid email or password');
+      } else {
+        Navigator.of(context)
+            .pushReplacementNamed('/home', arguments: user);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  void _continueAsGuest() {
+    final guest = User(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: _name,
-      email: _email,
-      phone: _phone,
-      preferredContactMethod: _preferredContact,
-      role: _selectedRole,
+      name: 'Guest User',
+      email: '',
+      phone: '',
+      preferredContactMethod: 'Email',
+      role: UserRole.guest,
     );
 
-    Navigator.of(context).pushReplacementNamed('/home', arguments: user);
+    Navigator.of(context).pushReplacementNamed('/home', arguments: guest);
+  }
+
+  void _openSignup() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SignupScreen()),
+    );
   }
 
   @override
@@ -44,95 +76,56 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Form(
             key: _formKey,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
-                  'Sign in or continue as guest',
+                  'Sign in to continue',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
-                  decoration: const InputDecoration(labelText: 'Full Name'),
-                  validator: (value) =>
-                      (value == null || value.isEmpty) ? 'Required' : null,
-                  onSaved: (value) => _name = value!.trim(),
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
                   decoration: const InputDecoration(labelText: 'Email'),
-                  validator: (value) =>
-                      (value == null || value.isEmpty) ? 'Required' : null,
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Required';
+                    }
+                    if (!value.contains('@')) {
+                      return 'Enter a valid email';
+                    }
+                    return null;
+                  },
                   onSaved: (value) => _email = value!.trim(),
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
-                  decoration: const InputDecoration(labelText: 'Phone'),
-                  validator: (value) =>
-                      (value == null || value.isEmpty) ? 'Required' : null,
-                  onSaved: (value) => _phone = value!.trim(),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: _preferredContact,
-                  items: const [
-                    DropdownMenuItem(value: 'Phone', child: Text('Phone')),
-                    DropdownMenuItem(value: 'Email', child: Text('Email')),
-                    DropdownMenuItem(value: 'WhatsApp', child: Text('WhatsApp')),
-                  ],
-                  decoration: const InputDecoration(
-                    labelText: 'Preferred Contact Method',
-                  ),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() => _preferredContact = value);
+                  decoration: const InputDecoration(labelText: 'Password'),
+                  obscureText: true,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Required';
                     }
+                    return null;
                   },
-                ),
-                const SizedBox(height: 16),
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Role',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: RadioListTile<UserRole>(
-                        title: const Text('Admin'),
-                        value: UserRole.admin,
-                        groupValue: _selectedRole,
-                        onChanged: (value) =>
-                            setState(() => _selectedRole = value!),
-                      ),
-                    ),
-                    Expanded(
-                      child: RadioListTile<UserRole>(
-                        title: const Text('Renter'),
-                        value: UserRole.renter,
-                        groupValue: _selectedRole,
-                        onChanged: (value) =>
-                            setState(() => _selectedRole = value!),
-                      ),
-                    ),
-                    Expanded(
-                      child: RadioListTile<UserRole>(
-                        title: const Text('Guest'),
-                        value: UserRole.guest,
-                        groupValue: _selectedRole,
-                        onChanged: (value) =>
-                            setState(() => _selectedRole = value!),
-                      ),
-                    ),
-                  ],
+                  onSaved: (value) => _password = value!,
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _submit,
-                    child: const Text('Continue'),
+                    onPressed: _isSubmitting ? null : _submit,
+                    child: Text(_isSubmitting ? 'Signing in...' : 'Login'),
                   ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _isSubmitting ? null : _openSignup,
+                  child: const Text("Don't have an account? Sign up"),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _isSubmitting ? null : _continueAsGuest,
+                  child: const Text('Continue as guest'),
                 ),
               ],
             ),

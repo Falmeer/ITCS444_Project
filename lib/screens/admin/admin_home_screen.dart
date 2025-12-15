@@ -8,6 +8,9 @@ import '../auth/login_screen.dart';
 import 'admin_donations_screen.dart';
 import 'equipment_form_screen.dart';
 import 'admin_reservations_screen.dart';
+import '../shared/profile_screen.dart';
+import 'admin_reports_screen.dart';
+import '../shared/notifications_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   final User user;
@@ -20,6 +23,14 @@ class AdminHomeScreen extends StatefulWidget {
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
   final FakeDataService _dataService = FakeDataService();
   int _selectedIndex = 0;
+
+  late User _user;
+
+  @override
+  void initState() {
+    super.initState();
+    _user = widget.user;
+  }
 
   void _showEquipmentActions(BuildContext context, Equipment equipment) {
     showModalBottomSheet(
@@ -72,13 +83,35 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       ),
       AdminReservationsScreen(dataService: _dataService),
       AdminDonationsScreen(dataService: _dataService),
-      const Center(child: Text('Reports & Statistics (TODO)')),
+      AdminReportsScreen(dataService: _dataService),
+      ProfileScreen(
+        user: _user,
+        onUserUpdated: (updated) {
+          setState(() {
+            _user = updated;
+          });
+        },
+      ),
     ];
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Admin - ${widget.user.name}'),
+        title: Text('Admin - ${_user.name}'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications),
+            tooltip: 'Notifications',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => NotificationsScreen(
+                    user: _user,
+                    dataService: _dataService,
+                  ),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Switch user / Logout',
@@ -118,7 +151,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           BottomNavigationBarItem(
               icon: Icon(Icons.volunteer_activism), label: 'Donations'),
           BottomNavigationBarItem(
-              icon: Icon(Icons.bar_chart), label: 'Reports'),
+            icon: Icon(Icons.bar_chart), label: 'Reports'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
     );

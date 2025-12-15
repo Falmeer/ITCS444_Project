@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../models/donation.dart';
 import '../../models/user.dart';
@@ -20,21 +23,33 @@ class DonationForm extends StatefulWidget {
 
 class _DonationFormState extends State<DonationForm> {
   final _formKey = GlobalKey<FormState>();
-  String _itemType = '';
+  String? _selectedTypeOption;
+  final TextEditingController _otherTypeController = TextEditingController();
   String _condition = 'Good';
   String _description = '';
+  Uint8List? _imageBytes;
+  final ImagePicker _picker = ImagePicker();
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
 
+    // Resolve the actual item type from dropdown + optional "Other" text.
+    String itemType;
+    if (_selectedTypeOption == 'Other') {
+      itemType = _otherTypeController.text.trim();
+    } else {
+      itemType = (_selectedTypeOption ?? '').trim();
+    }
+
     final donation = Donation(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       donor: widget.user,
-      itemType: _itemType,
+      itemType: itemType,
       condition: _condition,
       description: _description,
       imageUrl: null,
+      imageBytes: _imageBytes,
       status: DonationStatus.pendingApproval,
       createdAt: DateTime.now(),
     );
@@ -60,18 +75,77 @@ class _DonationFormState extends State<DonationForm> {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            TextFormField(
+            DropdownButtonFormField<String>(
+              initialValue: _selectedTypeOption,
               decoration: const InputDecoration(
-                labelText: 'Item type (e.g., Wheelchair)',
+                labelText: 'Item type',
                 border: OutlineInputBorder(),
               ),
+              items: const [
+                DropdownMenuItem(
+                  value: 'Wheelchair',
+                  child: Text('Wheelchair'),
+                ),
+                DropdownMenuItem(
+                  value: 'Walker',
+                  child: Text('Walker'),
+                ),
+                DropdownMenuItem(
+                  value: 'Crutches',
+                  child: Text('Crutches'),
+                ),
+                DropdownMenuItem(
+                  value: 'Cane',
+                  child: Text('Cane'),
+                ),
+                DropdownMenuItem(
+                  value: 'Shower Chair',
+                  child: Text('Shower Chair'),
+                ),
+                DropdownMenuItem(
+                  value: 'Commode',
+                  child: Text('Commode'),
+                ),
+                DropdownMenuItem(
+                  value: 'Hospital Bed',
+                  child: Text('Hospital Bed'),
+                ),
+                DropdownMenuItem(
+                  value: 'Oxygen Machine',
+                  child: Text('Oxygen Machine'),
+                ),
+                DropdownMenuItem(
+                  value: 'Other',
+                  child: Text('Other'),
+                ),
+              ],
               validator: (value) =>
-                  (value == null || value.isEmpty) ? 'Required' : null,
-              onSaved: (value) => _itemType = value!.trim(),
+                  (value == null || value.isEmpty) ? 'Please choose a type' : null,
+              onChanged: (value) {
+                setState(() => _selectedTypeOption = value);
+              },
             ),
+            if (_selectedTypeOption == 'Other') ...[
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _otherTypeController,
+                decoration: const InputDecoration(
+                  labelText: 'Other type',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (v) {
+                  if (_selectedTypeOption == 'Other') {
+                    if (v == null || v.isEmpty) {
+                      return 'Please specify the type';
+                    }
+                  }
+                  return null;
+                },
+              ),
+            ],
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _condition,
+              initialValue: _condition,
               decoration: const InputDecoration(
                 labelText: 'Condition',
                 border: OutlineInputBorder(),
@@ -97,6 +171,43 @@ class _DonationFormState extends State<DonationForm> {
               maxLines: 3,
               onSaved: (value) => _description = value!.trim(),
             ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final picked = await _picker.pickImage(
+                      source: ImageSource.gallery,
+                      maxWidth: 1024,
+                    );
+                    if (picked != null) {
+                      final bytes = await picked.readAsBytes();
+                      setState(() {
+                        _imageBytes = bytes;
+                      });
+                    }
+                  },
+                  icon: const Icon(Icons.photo_library),
+                  label: const Text('Select Photo (optional)'),
+                ),
+                const SizedBox(width: 12),
+                if (_imageBytes != null)
+                  const Text('Photo selected'),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (_imageBytes != null)
+              SizedBox(
+                height: 140,
+                width: double.infinity,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.memory(
+                    _imageBytes!,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,

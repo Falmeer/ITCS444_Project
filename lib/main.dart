@@ -1,12 +1,19 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+
 import 'models/user.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/admin/admin_home_screen.dart';
 import 'screens/renter/renter_home_screen.dart';
 import 'screens/guest/guest_home_screen.dart';
+import 'services/fake_data_services.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+  await FakeDataService().initialize();
+
   runApp(const CareCenterApp());
 }
 

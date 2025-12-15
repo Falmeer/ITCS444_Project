@@ -6,6 +6,8 @@ import '../shared/equipment_list_screen.dart';
 import '../shared/donation_form.dart';
 import '../auth/login_screen.dart';
 import '../shared/equipment_details_screen.dart';
+import '../shared/profile_screen.dart';
+import '../shared/notifications_screen.dart';
 
 class GuestHomeScreen extends StatefulWidget {
   final User user;
@@ -19,6 +21,14 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
   final FakeDataService _dataService = FakeDataService();
   int _selectedIndex = 0;
 
+  late User _user;
+
+  @override
+  void initState() {
+    super.initState();
+    _user = widget.user;
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = [
@@ -29,22 +39,43 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
           MaterialPageRoute(
             builder: (_) => EquipmentDetailsScreen(
               equipment: equipment,
-              user: widget.user,
+              user: _user,
               dataService: _dataService,
             ),
           ),
         ),
       ),
       // Donation form entry point for guests
-      DonationForm(user: widget.user, dataService: _dataService),
+      DonationForm(user: _user, dataService: _dataService),
       // Simple guest profile / contact info
-      const Center(child: Text('Profile (TODO)')),
+      ProfileScreen(
+        user: _user,
+        onUserUpdated: (updated) {
+          setState(() {
+            _user = updated;
+          });
+        },
+      ),
     ];
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Care Center (Guest)'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications),
+            tooltip: 'Notifications',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => NotificationsScreen(
+                    user: _user,
+                    dataService: _dataService,
+                  ),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Switch user / Logout',

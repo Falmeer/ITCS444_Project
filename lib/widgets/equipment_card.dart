@@ -40,13 +40,39 @@ class EquipmentCard extends StatelessWidget {
     }
   }
 
+  IconData _iconForType(String type) {
+    final t = type.toLowerCase();
+    if (t.contains('wheelchair')) return Icons.wheelchair_pickup;
+    if (t.contains('walker')) return Icons.elderly;
+    if (t.contains('crutch') || t.contains('crutches')) {
+      return Icons.accessibility_new;
+    }
+    if (t.contains('bed') || t.contains('hospital')) {
+      return Icons.airline_seat_individual_suite;
+    }
+    if (t.contains('oxygen') || t.contains('ventilator')) {
+      return Icons.air;
+    }
+    return Icons.medical_services;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: ListTile(
         leading: CircleAvatar(
-          child: Text(equipment.name[0]),
+          backgroundImage: equipment.imageBytes != null
+              ? MemoryImage(equipment.imageBytes!)
+              : (equipment.imageUrl != null &&
+                      equipment.imageUrl!.trim().isNotEmpty
+                  ? NetworkImage(equipment.imageUrl!.trim())
+                  : null) as ImageProvider<Object>?,
+          child: (equipment.imageBytes == null &&
+                  (equipment.imageUrl == null ||
+                      equipment.imageUrl!.trim().isEmpty))
+              ? Icon(_iconForType(equipment.type))
+              : null,
         ),
         title: Text(equipment.name),
         subtitle: Text(

@@ -67,9 +67,41 @@ class _AdminDonationsScreenState extends State<AdminDonationsScreen> {
               icon: const Icon(Icons.close, color: Colors.redAccent),
               tooltip: 'Reject',
               onPressed: () {
-                widget.dataService
-                    .updateDonationStatus(donation.id, DonationStatus.rejected);
-                setState(() {});
+                showDialog<String?>(
+                  context: context,
+                  builder: (ctx) {
+                    final controller = TextEditingController();
+                    return AlertDialog(
+                      title: const Text('Reason for rejection'),
+                      content: TextField(
+                        controller: controller,
+                        decoration: const InputDecoration(
+                          hintText: 'Optional: explain why this donation is rejected',
+                        ),
+                        maxLines: 3,
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+                          child: const Text('Save'),
+                        ),
+                      ],
+                    );
+                  },
+                ).then((reason) {
+                  widget.dataService.updateDonationStatus(
+                    donation.id,
+                    DonationStatus.rejected,
+                    rejectionReason: (reason != null && reason.isNotEmpty)
+                        ? reason
+                        : null,
+                  );
+                  setState(() {});
+                });
               },
             ),
             IconButton(
